@@ -1,20 +1,40 @@
+import React, { useEffect } from 'react';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { NavigationContainer } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import * as Notifications from 'expo-notifications';
+import { AppNavigator } from './src/navigation/AppNavigator';
+import { requestNotificationPermissions } from './src/utils/notificationHelper';
 
 export default function App() {
+  useEffect(() => {
+    // Request notification permissions on app launch
+    requestNotificationPermissions();
+
+    // Listen for incoming notifications when app is active
+    const notificationSubscription =
+      Notifications.addNotificationReceivedListener((notification) => {
+        console.log('Notification received:', notification);
+      });
+
+    // Listen for user interactions with notifications (e.g. tapping the reminder)
+    const responseSubscription =
+      Notifications.addNotificationResponseReceivedListener((response) => {
+        console.log('User interacted with notification:', response);
+      });
+
+    return () => {
+      notificationSubscription.remove();
+      responseSubscription.remove();
+    };
+  }, []);
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <SafeAreaProvider>
+      <NavigationContainer>
+        <StatusBar style="dark" />
+        <AppNavigator />
+      </NavigationContainer>
+    </SafeAreaProvider>
   );
 }
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});

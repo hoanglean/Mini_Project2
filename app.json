@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Mini_Project2",
-    "slug": "Mini_Project2",
+    "name": "Campus Room & Lab Booking",
+    "slug": "campus-room-booking",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -20,6 +20,15 @@
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/icon.png",
+          "color": "#4F46E5"
+        }
+      ]
+    ]
   }
 }
