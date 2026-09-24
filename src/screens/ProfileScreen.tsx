@@ -256,12 +256,7 @@ export const ProfileScreen: React.FC = () => {
             </View>
 
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              {userSession.provider === 'google' && (
-                <View style={styles.providerBadgeGoogle}>
-                  <Ionicons name="logo-google" size={11} color="#EA4335" />
-                  <Text style={styles.providerBadgeGoogleText}>Google</Text>
-                </View>
-              )}
+
               {userSession.provider === 'email' && (
                 <View style={styles.providerBadgeEmail}>
                   <Ionicons name="mail" size={11} color={theme.colors.primary} />
@@ -385,17 +380,15 @@ export const ProfileScreen: React.FC = () => {
               <View style={styles.authInfoRow}>
                 <View style={styles.authIconCircle}>
                   <Ionicons
-                    name={userSession.provider === 'google' ? 'logo-google' : 'person'}
+                    name="person"
                     size={20}
-                    color={userSession.provider === 'google' ? '#EA4335' : theme.colors.primary}
+                    color={theme.colors.primary}
                   />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.authEmail}>{userSession.email || userSession.name}</Text>
                   <Text style={styles.authProviderNote}>
-                    {userSession.provider === 'google'
-                      ? 'Đăng nhập bảo mật qua Google'
-                      : 'Đăng nhập bằng tài khoản Sinh viên'}
+                    Đăng nhập bằng tài khoản Sinh viên
                   </Text>
                 </View>
               </View>
@@ -428,14 +421,14 @@ export const ProfileScreen: React.FC = () => {
               <View style={{ flex: 1 }}>
                 <Text style={styles.guestBannerTitle}>Bạn đang dùng chế độ Khách</Text>
                 <Text style={styles.guestBannerSubtitle}>
-                  Đăng nhập bằng Google hoặc tài khoản trường để lưu trữ vé phòng học và nhận thông báo cá nhân.
+                  Đăng nhập bằng tài khoản trường để lưu trữ vé phòng học và nhận thông báo cá nhân.
                 </Text>
                 <TouchableOpacity
                   style={styles.loginNowBtn}
                   onPress={() => navigation.navigate('Auth')}
                   activeOpacity={0.85}
                 >
-                  <Ionicons name="logo-google" size={15} color="#FFFFFF" />
+                  <Ionicons name="log-in-outline" size={15} color="#FFFFFF" />
                   <Text style={styles.loginNowText}>Đăng Nhập / Đăng Ký Ngay</Text>
                 </TouchableOpacity>
               </View>

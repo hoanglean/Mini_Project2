@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -18,11 +18,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import * as WebBrowser from 'expo-web-browser';
-import * as Google from 'expo-auth-session/providers/google';
+import { makeRedirectUri } from 'expo-auth-session';
 import { useBookingStore } from '../store/useBookingStore';
+import { supabase } from '../lib/supabase';
 import { theme } from '../utils/theme';
 
-// Ensure web browser auth completes properly on web
 WebBrowser.maybeCompleteAuthSession();
 
 const POPULAR_FACULTIES = [
@@ -32,8 +32,6 @@ const POPULAR_FACULTIES = [
   'Khoa Khoa Học Máy Tính',
   'Khoa Quản Trị Kinh Doanh',
 ];
-
-
 
 export const AuthScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -69,70 +67,129 @@ export const AuthScreen: React.FC = () => {
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSubmitted, setForgotSubmitted] = useState(false);
 
-  // Setup expo-auth-session Google OAuth Request
-  const [request, response, promptAsync] = Google.useAuthRequest({
-    clientId: '603386649315-9528rhq8821um92k8f47sfaed67q06h8.apps.googleusercontent.com',
-    webClientId: '603386649315-9528rhq8821um92k8f47sfaed67q06h8.apps.googleusercontent.com',
-    androidClientId: '603386649315-9528rhq8821um92k8f47sfaed67q06h8.apps.googleusercontent.com',
-    iosClientId: '603386649315-9528rhq8821um92k8f47sfaed67q06h8.apps.googleusercontent.com',
-    scopes: ['profile', 'email'],
-  });
+  // Handle OAuth callback on Web if redirected
+  React.useEffect(() => {
+    if (Platform.OS === 'web' && typeof window !== 'undefined') {
+      const hash = window.location.hash;
+      const search = window.location.search;
 
-  // Handle Google OAuth response if user uses real Google Cloud endpoint
-  useEffect(() => {
-    if (response?.type === 'success' && response.authentication?.accessToken) {
-      handleRealGoogleAuth(response.authentication.accessToken);
-    }
-  }, [response]);
+      if ((hash && hash.includes('access_token')) || (search && search.includes('code='))) {
+        setLoading(true);
+        supabase.auth.getSession().then(async ({ data: sessionData, error: sessionErr }) => {
+          if (!sessionErr && sessionData?.session?.user) {
+            const user = sessionData.session.user;
+            await loginWithGoogle({
+              name: user.user_metadata?.full_name || user.user_metadata?.name || '',
+              email: user.email || '',
+              studentId: 'GG-' + (user.id?.slice(-5) || ''),
+              faculty: 'Khoa Công Nghệ Thông Tin',
+            });
+            window.history.replaceState(null, '', window.location.pathname);
+            navigation.replace('MainTabs');
+            setLoading(false);
+            return;
+          }
 
-  const handleRealGoogleAuth = async (token: string) => {
-    try {
-      setLoading(true);
-      const res = await fetch('https://www.googleapis.com/userinfo/v2/me', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const user = await res.json();
-      if (user?.email) {
-        await loginWithGoogle({
-          name: user.name || 'Sinh viên Google',
-          email: user.email,
-          avatarUrl: user.picture || '',
-          studentId: 'GG-' + (user.id?.slice(-5) || Math.floor(10000 + Math.random() * 90000)),
-          faculty: 'Khoa Công Nghệ Thông Tin',
+          if (hash && hash.includes('access_token')) {
+            const params = new URLSearchParams(hash.substring(1));
+            const accessToken = params.get('access_token');
+            const refreshToken = params.get('refresh_token');
+            if (accessToken) {
+              const { data: manualData, error: manualErr } = await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken || '',
+              });
+              if (!manualErr && manualData?.user) {
+                await loginWithGoogle({
+                  name: manualData.user.user_metadata?.full_name || manualData.user.user_metadata?.name || '',
+                  email: manualData.user.email || '',
+                  studentId: 'GG-' + (manualData.user.id?.slice(-5) || ''),
+                  faculty: 'Khoa Công Nghệ Thông Tin',
+                });
+                window.history.replaceState(null, '', window.location.pathname);
+                navigation.replace('MainTabs');
+              }
+            }
+          }
+          setLoading(false);
         });
-        navigation.replace('MainTabs');
       }
-    } catch (err) {
-      console.warn('Real Google Auth fetch error:', err);
-    } finally {
-      setLoading(false);
     }
-  };
+  }, []);
 
   const handleGooglePress = async () => {
     try {
       setLoading(true);
-      if (promptAsync) {
-        const result = await promptAsync();
-        if (result?.type === 'success' && result.authentication?.accessToken) {
-          await handleRealGoogleAuth(result.authentication.accessToken);
-          return;
+
+      // On Web: redirect directly in the same tab for smooth authentication
+      if (Platform.OS === 'web' && typeof window !== 'undefined') {
+        const { error } = await supabase.auth.signInWithOAuth({
+          provider: 'google',
+          options: {
+            redirectTo: window.location.origin,
+          },
+        });
+        if (error) {
+          Alert.alert('Lỗi đăng nhập', error.message);
+          setLoading(false);
+        }
+        return;
+      }
+
+      // On Mobile (iOS / Android / Expo Go)
+      const redirectTo = makeRedirectUri({ scheme: 'campusbooking', path: 'auth/callback' });
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo,
+          skipBrowserRedirect: true,
+        },
+      });
+
+      if (error) {
+        Alert.alert('Lỗi đăng nhập', error.message);
+        return;
+      }
+
+      if (data?.url) {
+        const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+        if (result.type === 'success' && result.url) {
+          // Extract tokens from the redirect URL
+          const url = new URL(result.url);
+          const params = new URLSearchParams(url.hash?.substring(1) || url.search?.substring(1));
+          const accessToken = params.get('access_token');
+          const refreshToken = params.get('refresh_token');
+
+          if (accessToken) {
+            const { data: sessionData, error: sessionError } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken || '',
+            });
+
+            if (sessionError) {
+              Alert.alert('Lỗi phiên đăng nhập', sessionError.message);
+              return;
+            }
+
+            if (sessionData.user) {
+              await loginWithGoogle({
+                name: sessionData.user.user_metadata?.full_name || sessionData.user.user_metadata?.name || '',
+                email: sessionData.user.email || '',
+                studentId: 'GG-' + (sessionData.user.id?.slice(-5) || ''),
+                faculty: 'Khoa Công Nghệ Thông Tin',
+              });
+              navigation.replace('MainTabs');
+            }
+          }
         }
       }
-      // If direct OAuth session fallback is needed
-      await WebBrowser.openBrowserAsync('https://accounts.google.com/');
     } catch (err: any) {
-      console.warn('Google Browser Auth error:', err);
-      try {
-        await WebBrowser.openBrowserAsync('https://accounts.google.com/');
-      } catch (browserErr) {
-        Alert.alert('Lỗi trình duyệt', 'Không thể khởi động trình duyệt Google.');
-      }
+      console.warn('Google sign-in error:', err);
+      Alert.alert('Lỗi đăng nhập', 'Không thể hoàn tất đăng nhập với Google.');
     } finally {
       setLoading(false);
     }
   };
-
 
   const handleLoginSubmit = async () => {
     if (!loginEmail.trim()) {
@@ -242,7 +299,7 @@ export const AuthScreen: React.FC = () => {
             </Text>
           </View>
 
-          {/* Google Sign-In Primary Button */}
+          {/* Google Sign-In Button */}
           <TouchableOpacity
             style={styles.googleBtn}
             onPress={handleGooglePress}
@@ -252,12 +309,9 @@ export const AuthScreen: React.FC = () => {
               <Ionicons name="logo-google" size={18} color="#EA4335" />
             </View>
             <Text style={styles.googleBtnText}>Tiếp tục với Google</Text>
-            <View style={styles.googleBadge}>
-              <Text style={styles.googleBadgeText}>1-Chạm</Text>
-            </View>
           </TouchableOpacity>
 
-          {/* Divider "Hoặc với Email" */}
+          {/* Divider */}
           <View style={styles.dividerRow}>
             <View style={styles.dividerLine} />
             <Text style={styles.dividerText}>hoặc tài khoản sinh viên</Text>
@@ -734,18 +788,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: '#1F2937',
   },
-  googleBadge: {
-    marginLeft: 8,
-    backgroundColor: '#EEF2FF',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  googleBadgeText: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: theme.colors.primary,
-  },
+
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
