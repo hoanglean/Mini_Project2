@@ -65,16 +65,17 @@ export const AuthScreen: React.FC = () => {
 
   // Status & Modals
   const [loading, setLoading] = useState(false);
-  const [googleModalVisible, setGoogleModalVisible] = useState(false);
   const [forgotModalVisible, setForgotModalVisible] = useState(false);
   const [forgotEmail, setForgotEmail] = useState('');
   const [forgotSubmitted, setForgotSubmitted] = useState(false);
 
   // Setup expo-auth-session Google OAuth Request
   const [request, response, promptAsync] = Google.useAuthRequest({
-    androidClientId: 'CAMPUS_ANDROID_CLIENT_ID',
-    iosClientId: 'CAMPUS_IOS_CLIENT_ID',
-    webClientId: 'CAMPUS_WEB_CLIENT_ID',
+    clientId: '603386649315-9528rhq8821um92k8f47sfaed67q06h8.apps.googleusercontent.com',
+    webClientId: '603386649315-9528rhq8821um92k8f47sfaed67q06h8.apps.googleusercontent.com',
+    androidClientId: '603386649315-9528rhq8821um92k8f47sfaed67q06h8.apps.googleusercontent.com',
+    iosClientId: '603386649315-9528rhq8821um92k8f47sfaed67q06h8.apps.googleusercontent.com',
+    scopes: ['profile', 'email'],
   });
 
   // Handle Google OAuth response if user uses real Google Cloud endpoint
@@ -108,57 +109,30 @@ export const AuthScreen: React.FC = () => {
     }
   };
 
-  // Google Custom Auth states (User inputs their own Google account)
-  const [googleEmail, setGoogleEmail] = useState('');
-  const [googleName, setGoogleName] = useState('');
-  const [googleStudentId, setGoogleStudentId] = useState('');
-
   const handleGooglePress = async () => {
-    setGoogleModalVisible(true);
-  };
-
-  const handleGoogleSubmit = async () => {
-    const cleanEmail = googleEmail.trim();
-    if (!cleanEmail) {
-      Alert.alert('Chưa nhập Email', 'Vui lòng nhập địa chỉ email Google (@gmail.com) của bạn.');
-      return;
-    }
-    if (!cleanEmail.includes('@')) {
-      Alert.alert('Email không hợp lệ', 'Vui lòng nhập đúng định dạng email (ví dụ: yourname@gmail.com).');
-      return;
-    }
-
-    setGoogleModalVisible(false);
-    setLoading(true);
-
-    const derivedName =
-      googleName.trim() ||
-      cleanEmail
-        .split('@')[0]
-        .replace(/[._-]/g, ' ')
-        .replace(/\b\w/g, (l) => l.toUpperCase());
-
-    const derivedStudentId =
-      googleStudentId.trim().toUpperCase() ||
-      'GG-' + Math.floor(10000 + Math.random() * 90000);
-
     try {
-      const res = await loginWithGoogle({
-        name: derivedName,
-        email: cleanEmail,
-        studentId: derivedStudentId,
-        faculty: 'Khoa Công Nghệ Thông Tin',
-        avatarUrl: '',
-      });
-      if (res.success) {
-        navigation.replace('MainTabs');
+      setLoading(true);
+      if (promptAsync) {
+        const result = await promptAsync();
+        if (result?.type === 'success' && result.authentication?.accessToken) {
+          await handleRealGoogleAuth(result.authentication.accessToken);
+          return;
+        }
       }
-    } catch (err) {
-      Alert.alert('Lỗi đăng nhập', 'Không thể hoàn tất đăng nhập Google.');
+      // If direct OAuth session fallback is needed
+      await WebBrowser.openBrowserAsync('https://accounts.google.com/');
+    } catch (err: any) {
+      console.warn('Google Browser Auth error:', err);
+      try {
+        await WebBrowser.openBrowserAsync('https://accounts.google.com/');
+      } catch (browserErr) {
+        Alert.alert('Lỗi trình duyệt', 'Không thể khởi động trình duyệt Google.');
+      }
     } finally {
       setLoading(false);
     }
   };
+
 
   const handleLoginSubmit = async () => {
     if (!loginEmail.trim()) {
@@ -586,110 +560,6 @@ export const AuthScreen: React.FC = () => {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {/* Interactive Google Account Chooser Modal */}
-      <Modal
-        visible={googleModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setGoogleModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.googleModalCard}>
-            <View style={styles.googleModalHeader}>
-              <View style={styles.googleIconBox}>
-                <Ionicons name="logo-google" size={24} color="#EA4335" />
-              </View>
-              <Text style={styles.googleModalTitle}>Đăng nhập với Google</Text>
-              <Text style={styles.googleModalSubtitle}>
-                Chọn tài khoản để tiếp tục đăng nhập vào Campus Space
-              </Text>
-            </View>
-
-            <View style={styles.googleInputForm}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>EMAIL TÀI KHOẢN GOOGLE *</Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="logo-google" size={16} color="#EA4335" />
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="ví dụ: yourname@gmail.com"
-                    placeholderTextColor={theme.colors.textMuted}
-                    value={googleEmail}
-                    onChangeText={setGoogleEmail}
-                    autoCapitalize="none"
-                    keyboardType="email-address"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>HỌ VÀ TÊN SINH VIÊN (TÙY CHỌN)</Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="person-outline" size={16} color={theme.colors.textMuted} />
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="Nhập họ và tên của bạn"
-                    placeholderTextColor={theme.colors.textMuted}
-                    value={googleName}
-                    onChangeText={setGoogleName}
-                    autoCapitalize="words"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>MÃ SỐ SINH VIÊN (TÙY CHỌN)</Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="card-outline" size={16} color={theme.colors.textMuted} />
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="ví dụ: 22IT-108"
-                    placeholderTextColor={theme.colors.textMuted}
-                    value={googleStudentId}
-                    onChangeText={setGoogleStudentId}
-                    autoCapitalize="characters"
-                  />
-                </View>
-              </View>
-
-              <TouchableOpacity
-                style={styles.confirmGoogleBtn}
-                onPress={handleGoogleSubmit}
-                activeOpacity={0.85}
-              >
-                <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
-                <Text style={styles.confirmGoogleBtnText}>Đăng Nhập Với Tài Khoản Này</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Custom Google OAuth Trigger (if real client ID is configured) */}
-            {request && (
-              <TouchableOpacity
-                style={styles.realGoogleOAuthBtn}
-                onPress={() => {
-                  setGoogleModalVisible(false);
-                  promptAsync();
-                }}
-                activeOpacity={0.8}
-              >
-                <Ionicons name="globe-outline" size={16} color={theme.colors.primary} />
-                <Text style={styles.realGoogleOAuthText}>
-                  Đăng nhập qua trình duyệt Google Web...
-                </Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
-              style={styles.closeGoogleModalBtn}
-              onPress={() => setGoogleModalVisible(false)}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.closeGoogleModalText}>Hủy bỏ</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
-
       {/* Forgot Password Modal */}
       <Modal
         visible={forgotModalVisible}
@@ -1063,84 +933,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
-  },
-  googleModalCard: {
-    width: '100%',
-    maxWidth: 400,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 20,
-    padding: 22,
-    ...theme.shadows.medium,
-  },
-  googleModalHeader: {
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  googleIconBox: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  googleModalTitle: {
-    fontSize: 18,
-    fontWeight: '800',
-    color: '#1F2937',
-    marginBottom: 4,
-  },
-  googleModalSubtitle: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-    textAlign: 'center',
-  },
-  googleInputForm: {
-    marginBottom: 14,
-    gap: 2,
-  },
-  confirmGoogleBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.primary,
-    paddingVertical: 12,
-    borderRadius: theme.borderRadius.md,
-    gap: 8,
-    marginTop: 6,
-    ...theme.shadows.soft,
-  },
-  confirmGoogleBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  realGoogleOAuthBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    borderRadius: theme.borderRadius.sm,
-    backgroundColor: '#EEF2FF',
-    gap: 6,
-    marginBottom: 8,
-  },
-  realGoogleOAuthText: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: theme.colors.primary,
-  },
-  closeGoogleModalBtn: {
-    alignItems: 'center',
-    paddingVertical: 10,
-  },
-  closeGoogleModalText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: theme.colors.textMuted,
   },
   forgotCard: {
     width: '100%',
