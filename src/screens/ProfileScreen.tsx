@@ -15,6 +15,7 @@ import {
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
 import { useBookingStore } from '../store/useBookingStore';
 import { requestNotificationPermissions } from '../utils/notificationHelper';
 import { theme } from '../utils/theme';
@@ -29,10 +30,15 @@ const PRESET_AVATARS = [
 ];
 
 export const ProfileScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
   const userSession = useBookingStore((state) => state.userSession);
   const updateUserSession = useBookingStore((state) => state.updateUserSession);
   const activeReservations = useBookingStore((state) => state.activeReservations);
+  const isAuthenticated = useBookingStore((state) => state.isAuthenticated);
+  const logout = useBookingStore((state) => state.logout);
+
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
   // Edit profile modal state
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -107,6 +113,15 @@ export const ProfileScreen: React.FC = () => {
         );
       }
     }
+  };
+
+  const handleConfirmLogout = () => {
+    setLogoutModalVisible(false);
+    logout();
+    navigation.reset({
+      index: 0,
+      routes: [{ name: 'Auth' }],
+    });
   };
 
   const handleOpenEdit = () => {
@@ -240,22 +255,37 @@ export const ProfileScreen: React.FC = () => {
               </Text>
             </View>
 
-            <TouchableOpacity
-              style={[
-                styles.idBadgeVerified,
-                !hasConfiguredProfile && { backgroundColor: theme.colors.primary },
-              ]}
-              onPress={handleOpenEdit}
-            >
-              <Ionicons
-                name={hasConfiguredProfile ? 'shield-checkmark' : 'create'}
-                size={15}
-                color="#FFFFFF"
-              />
-              <Text style={styles.idBadgeVerifiedText}>
-                {hasConfiguredProfile ? 'Đã Xác Thực' : 'Chỉnh Sửa Hồ Sơ'}
-              </Text>
-            </TouchableOpacity>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              {userSession.provider === 'google' && (
+                <View style={styles.providerBadgeGoogle}>
+                  <Ionicons name="logo-google" size={11} color="#EA4335" />
+                  <Text style={styles.providerBadgeGoogleText}>Google</Text>
+                </View>
+              )}
+              {userSession.provider === 'email' && (
+                <View style={styles.providerBadgeEmail}>
+                  <Ionicons name="mail" size={11} color={theme.colors.primary} />
+                  <Text style={styles.providerBadgeEmailText}>Email</Text>
+                </View>
+              )}
+
+              <TouchableOpacity
+                style={[
+                  styles.idBadgeVerified,
+                  !hasConfiguredProfile && { backgroundColor: theme.colors.primary },
+                ]}
+                onPress={handleOpenEdit}
+              >
+                <Ionicons
+                  name={hasConfiguredProfile ? 'shield-checkmark' : 'create'}
+                  size={14}
+                  color="#FFFFFF"
+                />
+                <Text style={styles.idBadgeVerifiedText}>
+                  {hasConfiguredProfile ? 'Đã Xác Thực' : 'Chỉnh Sửa'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
 
@@ -346,7 +376,113 @@ export const ProfileScreen: React.FC = () => {
           </View>
         </View>
 
+        {/* Account Management & Auth Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionHeader}>ACCOUNT & AUTHENTICATION</Text>
+
+          {isAuthenticated ? (
+            <View style={styles.authCard}>
+              <View style={styles.authInfoRow}>
+                <View style={styles.authIconCircle}>
+                  <Ionicons
+                    name={userSession.provider === 'google' ? 'logo-google' : 'person'}
+                    size={20}
+                    color={userSession.provider === 'google' ? '#EA4335' : theme.colors.primary}
+                  />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.authEmail}>{userSession.email || userSession.name}</Text>
+                  <Text style={styles.authProviderNote}>
+                    {userSession.provider === 'google'
+                      ? 'Đăng nhập bảo mật qua Google'
+                      : 'Đăng nhập bằng tài khoản Sinh viên'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.authActionsRow}>
+                <TouchableOpacity
+                  style={styles.switchAccountBtn}
+                  onPress={() => navigation.navigate('Auth')}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="swap-horizontal" size={15} color={theme.colors.primary} />
+                  <Text style={styles.switchAccountText}>Đổi Tài Khoản</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.logoutBtn}
+                  onPress={() => setLogoutModalVisible(true)}
+                  activeOpacity={0.8}
+                >
+                  <Ionicons name="log-out-outline" size={15} color={theme.colors.danger} />
+                  <Text style={styles.logoutText}>Đăng Xuất</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.guestBannerCard}>
+              <View style={styles.guestIconCircle}>
+                <Ionicons name="person-outline" size={22} color={theme.colors.textMuted} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.guestBannerTitle}>Bạn đang dùng chế độ Khách</Text>
+                <Text style={styles.guestBannerSubtitle}>
+                  Đăng nhập bằng Google hoặc tài khoản trường để lưu trữ vé phòng học và nhận thông báo cá nhân.
+                </Text>
+                <TouchableOpacity
+                  style={styles.loginNowBtn}
+                  onPress={() => navigation.navigate('Auth')}
+                  activeOpacity={0.85}
+                >
+                  <Ionicons name="logo-google" size={15} color="#FFFFFF" />
+                  <Text style={styles.loginNowText}>Đăng Nhập / Đăng Ký Ngay</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+        </View>
+
       </ScrollView>
+
+      {/* Logout Confirmation Modal */}
+      <Modal
+        visible={logoutModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setLogoutModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.logoutModalCard}>
+            <View style={styles.logoutIconBox}>
+              <Ionicons name="log-out-outline" size={28} color={theme.colors.danger} />
+            </View>
+            <Text style={styles.logoutModalTitle}>Xác Nhận Đăng Xuất</Text>
+            <Text style={styles.logoutModalSubtitle}>
+              Bạn có chắc chắn muốn đăng xuất khỏi tài khoản sinh viên {userSession.name || userSession.email}?
+            </Text>
+
+            <View style={styles.logoutModalActions}>
+              <TouchableOpacity
+                style={styles.cancelLogoutBtn}
+                onPress={() => setLogoutModalVisible(false)}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.cancelLogoutText}>Ở lại</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.confirmLogoutBtn}
+                onPress={handleConfirmLogout}
+                activeOpacity={0.85}
+              >
+                <Text style={styles.confirmLogoutText}>Đăng Xuất</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
 
       {/* Edit Profile Modal */}
       <Modal
@@ -1021,4 +1157,216 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 13,
   },
+  providerBadgeGoogle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FEF2F2',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: theme.borderRadius.full,
+    borderWidth: 1,
+    borderColor: '#FEE2E2',
+  },
+  providerBadgeGoogleText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#EA4335',
+  },
+  providerBadgeEmail: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: theme.borderRadius.full,
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
+  },
+  providerBadgeEmailText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: theme.colors.primary,
+  },
+  authCard: {
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    ...theme.shadows.soft,
+  },
+  authInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    marginBottom: 14,
+  },
+  authIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  authEmail: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.textPrimary,
+  },
+  authProviderNote: {
+    fontSize: 11,
+    color: theme.colors.textSecondary,
+    marginTop: 2,
+  },
+  authActionsRow: {
+    flexDirection: 'row',
+    gap: 10,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
+    paddingTop: 12,
+  },
+  switchAccountBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#EEF2FF',
+    paddingVertical: 9,
+    borderRadius: theme.borderRadius.sm,
+    gap: 6,
+  },
+  switchAccountText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.primary,
+  },
+  logoutBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.dangerLight,
+    paddingVertical: 9,
+    borderRadius: theme.borderRadius.sm,
+    gap: 6,
+  },
+  logoutText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: theme.colors.danger,
+  },
+  guestBannerCard: {
+    flexDirection: 'row',
+    backgroundColor: theme.colors.card,
+    borderRadius: theme.borderRadius.md,
+    padding: theme.spacing.md,
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    gap: 12,
+    ...theme.shadows.soft,
+  },
+  guestIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#F1F5F9',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  guestBannerTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: theme.colors.textPrimary,
+    marginBottom: 4,
+  },
+  guestBannerSubtitle: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    lineHeight: 16,
+    marginBottom: 10,
+  },
+  loginNowBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: theme.colors.primary,
+    paddingVertical: 9,
+    paddingHorizontal: 14,
+    borderRadius: theme.borderRadius.sm,
+    gap: 6,
+    alignSelf: 'flex-start',
+  },
+  loginNowText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
+  logoutModalCard: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 18,
+    padding: 22,
+    alignItems: 'center',
+    ...theme.shadows.medium,
+  },
+  logoutIconBox: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: theme.colors.dangerLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  logoutModalTitle: {
+    fontSize: 18,
+    fontWeight: '800',
+    color: theme.colors.textPrimary,
+    marginBottom: 6,
+  },
+  logoutModalSubtitle: {
+    fontSize: 12,
+    color: theme.colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 17,
+    marginBottom: 18,
+  },
+  logoutModalActions: {
+    flexDirection: 'row',
+    gap: 10,
+    width: '100%',
+  },
+  cancelLogoutBtn: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: '#EDF2F7',
+  },
+  cancelLogoutText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.colors.textSecondary,
+  },
+  confirmLogoutBtn: {
+    flex: 1.2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 11,
+    borderRadius: theme.borderRadius.md,
+    backgroundColor: theme.colors.danger,
+  },
+  confirmLogoutText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
+  },
 });
+

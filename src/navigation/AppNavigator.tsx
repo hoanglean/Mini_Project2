@@ -8,6 +8,7 @@ import { HomeScreen } from '../screens/HomeScreen';
 import { RoomDetailScreen } from '../screens/RoomDetailScreen';
 import { MyBookingsScreen } from '../screens/MyBookingsScreen';
 import { ProfileScreen } from '../screens/ProfileScreen';
+import { AuthScreen } from '../screens/AuthScreen';
 import { useBookingStore } from '../store/useBookingStore';
 import { theme } from '../utils/theme';
 
@@ -97,13 +98,17 @@ const MainTabs: React.FC = () => {
 };
 
 export const AppNavigator: React.FC = () => {
+  const isAuthenticated = useBookingStore((state) => state.isAuthenticated);
+
   return (
     <Stack.Navigator
+      initialRouteName={isAuthenticated ? 'MainTabs' : 'Auth'}
       screenOptions={{
         headerShown: false,
         animation: 'slide_from_right',
       }}
     >
+      <Stack.Screen name="Auth" component={AuthScreen} />
       <Stack.Screen name="MainTabs" component={MainTabs} />
       <Stack.Screen
         name="RoomDetail"
@@ -115,3 +120,4 @@ export const AppNavigator: React.FC = () => {
     </Stack.Navigator>
   );
 };
+

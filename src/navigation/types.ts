@@ -7,4 +7,6 @@ export type MainTabParamList = {
 export type RootStackParamList = {
   MainTabs: undefined;
   RoomDetail: { roomId: string };
+  Auth: { mode?: 'login' | 'register' } | undefined;
 };
+

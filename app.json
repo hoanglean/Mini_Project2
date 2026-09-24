@@ -10,6 +10,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.hoanglean.campusbooking",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -28,7 +29,13 @@
           "icon": "./assets/icon.png",
           "color": "#4F46E5"
         }
-      ]
-    ]
+      ],
+      "expo-web-browser"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "f5a7b1cf-e2cc-4470-9159-85524b03599e"
+      }
+    }
   }
 }

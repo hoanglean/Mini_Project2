@@ -65,4 +65,7 @@ export interface UserSession {
   email: string;
   faculty: string;
   avatarUrl: string;
+  provider?: 'email' | 'google' | 'guest';
+  isLoggedIn?: boolean;
 }
+

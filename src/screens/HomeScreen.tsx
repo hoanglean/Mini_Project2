@@ -86,9 +86,10 @@ export const HomeScreen: React.FC = () => {
 
         <TouchableOpacity
           style={styles.profileBadge}
-          onPress={() => navigation.navigate('MainTabs')}
+          onPress={() => (navigation as any).navigate('MainTabs', { screen: 'ProfileTab' })}
           activeOpacity={0.8}
         >
+
           <View style={styles.avatarCircle}>
             {userSession.avatarUrl ? (
               <Image

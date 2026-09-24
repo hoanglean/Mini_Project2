@@ -48,8 +48,28 @@ export interface BookingStoreState {
   isSlotBooked: (roomId: string, date: string, slot: TimeSlot) => boolean;
   isRoomAvailableNow: (roomId: string) => boolean;
   getFilteredRooms: () => Room[];
+  // Auth state
+  isAuthenticated: boolean;
+  loginWithEmail: (
+    email: string,
+    password: string
+  ) => Promise<{ success: boolean; error?: string }>;
+  registerWithEmail: (data: {
+    name: string;
+    studentId: string;
+    email: string;
+    faculty: string;
+    password: string;
+  }) => Promise<{ success: boolean; error?: string }>;
+  loginWithGoogle: (
+    googleData?: Partial<UserSession>
+  ) => Promise<{ success: boolean; error?: string }>;
+  logout: () => void;
+  continueAsGuest: () => void;
+
   setHydrated: (state: boolean) => void;
 }
+
 
 const initialFilters: FilterState = {
   searchQuery: '',
@@ -67,6 +87,7 @@ export const useBookingStore = create<BookingStoreState>()(
       selectedDate: getUpcomingDays(1)[0].dateString,
       filters: initialFilters,
       userSession: MOCK_USER,
+      isAuthenticated: false,
       isHydrated: false,
 
       setSelectedDate: (date: string) => {
@@ -316,6 +337,117 @@ export const useBookingStore = create<BookingStoreState>()(
         });
       },
 
+      loginWithEmail: async (email: string, password: string) => {
+        const cleanEmail = email.trim();
+        const cleanPass = password.trim();
+        if (!cleanEmail || !cleanPass) {
+          return { success: false, error: 'Vui lòng nhập đầy đủ email và mật khẩu.' };
+        }
+        if (cleanPass.length < 6) {
+          return { success: false, error: 'Mật khẩu phải có độ dài từ 6 ký tự trở lên.' };
+        }
+
+        const studentIdMatch = cleanEmail.match(/^([a-zA-Z0-9]+)@/);
+        const derivedStudentId = studentIdMatch
+          ? studentIdMatch[1].toUpperCase()
+          : `STU-${Math.floor(10000 + Math.random() * 90000)}`;
+        const derivedName = cleanEmail
+          .split('@')[0]
+          .replace(/[._-]/g, ' ')
+          .replace(/\b\w/g, (l) => l.toUpperCase());
+
+        const updatedUser: UserSession = {
+          studentId: get().userSession.studentId || derivedStudentId,
+          name: get().userSession.name || derivedName,
+          email: cleanEmail,
+          faculty: get().userSession.faculty || 'Khoa Công Nghệ Thông Tin',
+          avatarUrl: get().userSession.avatarUrl || '',
+          provider: 'email',
+          isLoggedIn: true,
+        };
+
+        set({
+          userSession: updatedUser,
+          isAuthenticated: true,
+        });
+        return { success: true };
+      },
+
+      registerWithEmail: async (data) => {
+        if (!data.name.trim() || !data.email.trim() || !data.studentId.trim() || !data.password.trim()) {
+          return { success: false, error: 'Vui lòng điền đầy đủ các thông tin bắt buộc.' };
+        }
+        if (data.password.length < 6) {
+          return { success: false, error: 'Mật khẩu phải có độ dài từ 6 ký tự trở lên.' };
+        }
+
+        const newUser: UserSession = {
+          studentId: data.studentId.trim().toUpperCase(),
+          name: data.name.trim(),
+          email: data.email.trim(),
+          faculty: data.faculty.trim() || 'Khoa Công Nghệ Thông Tin',
+          avatarUrl: '',
+          provider: 'email',
+          isLoggedIn: true,
+        };
+
+        set({
+          userSession: newUser,
+          isAuthenticated: true,
+        });
+        return { success: true };
+      },
+
+      loginWithGoogle: async (googleData?: Partial<UserSession>) => {
+        const defaultGoogleUser: UserSession = {
+          studentId: googleData?.studentId || '22IT-G' + Math.floor(1000 + Math.random() * 9000),
+          name: googleData?.name || 'Lê An Hoàng',
+          email: googleData?.email || 'hoanglean61@gmail.com',
+          faculty: googleData?.faculty || 'Khoa Kỹ Thuật Phần Mềm & AI',
+          avatarUrl: googleData?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
+          provider: 'google',
+          isLoggedIn: true,
+        };
+
+        set({
+          userSession: {
+            ...get().userSession,
+            ...defaultGoogleUser,
+            ...googleData,
+            provider: 'google',
+            isLoggedIn: true,
+          },
+          isAuthenticated: true,
+        });
+        return { success: true };
+      },
+
+      logout: () => {
+        set({
+          isAuthenticated: false,
+          userSession: {
+            studentId: '',
+            name: '',
+            email: '',
+            faculty: '',
+            avatarUrl: '',
+            provider: undefined,
+            isLoggedIn: false,
+          },
+        });
+      },
+
+      continueAsGuest: () => {
+        set({
+          isAuthenticated: false,
+          userSession: {
+            ...get().userSession,
+            provider: 'guest',
+            isLoggedIn: false,
+          },
+        });
+      },
+
       setHydrated: (state: boolean) => {
         set({ isHydrated: state });
       },
@@ -326,10 +458,15 @@ export const useBookingStore = create<BookingStoreState>()(
       partialize: (state) => ({
         activeReservations: state.activeReservations,
         userSession: state.userSession,
+        isAuthenticated: state.isAuthenticated,
       }),
       onRehydrateStorage: () => (state) => {
+        if (state?.userSession?.isLoggedIn) {
+          state.isAuthenticated = true;
+        }
         state?.setHydrated(true);
       },
     }
   )
 );
+
