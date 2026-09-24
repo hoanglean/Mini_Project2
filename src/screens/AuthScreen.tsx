@@ -33,37 +33,7 @@ const POPULAR_FACULTIES = [
   'Khoa Quản Trị Kinh Doanh',
 ];
 
-interface GooglePresetAccount {
-  name: string;
-  email: string;
-  studentId: string;
-  faculty: string;
-  avatarUrl: string;
-}
 
-const PRESET_GOOGLE_ACCOUNTS: GooglePresetAccount[] = [
-  {
-    name: 'Lê An Hoàng',
-    email: 'hoanglean61@gmail.com',
-    studentId: '22IT-G108',
-    faculty: 'Khoa Kỹ Thuật Phần Mềm & AI',
-    avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=400&q=80',
-  },
-  {
-    name: 'Alex Rivera',
-    email: 'alex.rivera@campus.edu.vn',
-    studentId: '21CS-9902',
-    faculty: 'Khoa Khoa Học Máy Tính',
-    avatarUrl: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=400&q=80',
-  },
-  {
-    name: 'Nguyễn Minh Thư',
-    email: 'thu.nguyen@campus.edu.vn',
-    studentId: '23IT-4512',
-    faculty: 'Khoa Công Nghệ Thông Tin',
-    avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?auto=format&fit=crop&w=400&q=80',
-  },
-];
 
 export const AuthScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -138,17 +108,48 @@ export const AuthScreen: React.FC = () => {
     }
   };
 
+  // Google Custom Auth states (User inputs their own Google account)
+  const [googleEmail, setGoogleEmail] = useState('');
+  const [googleName, setGoogleName] = useState('');
+  const [googleStudentId, setGoogleStudentId] = useState('');
+
   const handleGooglePress = async () => {
-    // Open Google Account Picker with 1-click preset / custom option
-    // This delivers a 100% reliable, instant Google login experience on Web, iOS and Android
     setGoogleModalVisible(true);
   };
 
-  const handleSelectGoogleAccount = async (account: GooglePresetAccount) => {
+  const handleGoogleSubmit = async () => {
+    const cleanEmail = googleEmail.trim();
+    if (!cleanEmail) {
+      Alert.alert('Chưa nhập Email', 'Vui lòng nhập địa chỉ email Google (@gmail.com) của bạn.');
+      return;
+    }
+    if (!cleanEmail.includes('@')) {
+      Alert.alert('Email không hợp lệ', 'Vui lòng nhập đúng định dạng email (ví dụ: yourname@gmail.com).');
+      return;
+    }
+
     setGoogleModalVisible(false);
     setLoading(true);
+
+    const derivedName =
+      googleName.trim() ||
+      cleanEmail
+        .split('@')[0]
+        .replace(/[._-]/g, ' ')
+        .replace(/\b\w/g, (l) => l.toUpperCase());
+
+    const derivedStudentId =
+      googleStudentId.trim().toUpperCase() ||
+      'GG-' + Math.floor(10000 + Math.random() * 90000);
+
     try {
-      const res = await loginWithGoogle(account);
+      const res = await loginWithGoogle({
+        name: derivedName,
+        email: cleanEmail,
+        studentId: derivedStudentId,
+        faculty: 'Khoa Công Nghệ Thông Tin',
+        avatarUrl: '',
+      });
       if (res.success) {
         navigation.replace('MainTabs');
       }
@@ -220,11 +221,6 @@ export const AuthScreen: React.FC = () => {
   const handleGuestContinue = () => {
     continueAsGuest();
     navigation.replace('MainTabs');
-  };
-
-  const fillDemoAccount = () => {
-    setLoginEmail('hoanglean61@gmail.com');
-    setLoginPassword('123456');
   };
 
   return (
@@ -420,18 +416,6 @@ export const AuthScreen: React.FC = () => {
                   </>
                 )}
               </TouchableOpacity>
-
-              {/* Quick Demo Autofill Hint */}
-              <TouchableOpacity
-                style={styles.quickFillBtn}
-                onPress={fillDemoAccount}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="sparkles-outline" size={14} color={theme.colors.primary} />
-                <Text style={styles.quickFillText}>
-                  Điền nhanh tài khoản mẫu (hoanglean61@gmail.com)
-                </Text>
-              </TouchableOpacity>
             </View>
           )}
 
@@ -621,25 +605,61 @@ export const AuthScreen: React.FC = () => {
               </Text>
             </View>
 
-            <View style={styles.accountList}>
-              {PRESET_GOOGLE_ACCOUNTS.map((acc) => (
-                <TouchableOpacity
-                  key={acc.email}
-                  style={styles.accountItem}
-                  onPress={() => handleSelectGoogleAccount(acc)}
-                  activeOpacity={0.75}
-                >
-                  <Image source={{ uri: acc.avatarUrl }} style={styles.accountAvatar} />
-                  <View style={styles.accountInfo}>
-                    <Text style={styles.accountName}>{acc.name}</Text>
-                    <Text style={styles.accountEmail}>{acc.email}</Text>
-                    <Text style={styles.accountMeta}>
-                      {acc.studentId} • {acc.faculty}
-                    </Text>
-                  </View>
-                  <Ionicons name="chevron-forward" size={18} color={theme.colors.textMuted} />
-                </TouchableOpacity>
-              ))}
+            <View style={styles.googleInputForm}>
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>EMAIL TÀI KHOẢN GOOGLE *</Text>
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="logo-google" size={16} color="#EA4335" />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="ví dụ: yourname@gmail.com"
+                    placeholderTextColor={theme.colors.textMuted}
+                    value={googleEmail}
+                    onChangeText={setGoogleEmail}
+                    autoCapitalize="none"
+                    keyboardType="email-address"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>HỌ VÀ TÊN SINH VIÊN (TÙY CHỌN)</Text>
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="person-outline" size={16} color={theme.colors.textMuted} />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="Nhập họ và tên của bạn"
+                    placeholderTextColor={theme.colors.textMuted}
+                    value={googleName}
+                    onChangeText={setGoogleName}
+                    autoCapitalize="words"
+                  />
+                </View>
+              </View>
+
+              <View style={styles.inputGroup}>
+                <Text style={styles.inputLabel}>MÃ SỐ SINH VIÊN (TÙY CHỌN)</Text>
+                <View style={styles.inputWrapper}>
+                  <Ionicons name="card-outline" size={16} color={theme.colors.textMuted} />
+                  <TextInput
+                    style={styles.textInput}
+                    placeholder="ví dụ: 22IT-108"
+                    placeholderTextColor={theme.colors.textMuted}
+                    value={googleStudentId}
+                    onChangeText={setGoogleStudentId}
+                    autoCapitalize="characters"
+                  />
+                </View>
+              </View>
+
+              <TouchableOpacity
+                style={styles.confirmGoogleBtn}
+                onPress={handleGoogleSubmit}
+                activeOpacity={0.85}
+              >
+                <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
+                <Text style={styles.confirmGoogleBtnText}>Đăng Nhập Với Tài Khoản Này</Text>
+              </TouchableOpacity>
             </View>
 
             {/* Custom Google OAuth Trigger (if real client ID is configured) */}
@@ -1078,42 +1098,25 @@ const styles = StyleSheet.create({
     color: theme.colors.textSecondary,
     textAlign: 'center',
   },
-  accountList: {
-    gap: 10,
+  googleInputForm: {
     marginBottom: 14,
+    gap: 2,
   },
-  accountItem: {
+  confirmGoogleBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 10,
+    justifyContent: 'center',
+    backgroundColor: theme.colors.primary,
+    paddingVertical: 12,
     borderRadius: theme.borderRadius.md,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
+    gap: 8,
+    marginTop: 6,
+    ...theme.shadows.soft,
   },
-  accountAvatar: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
-    marginRight: 10,
-  },
-  accountInfo: {
-    flex: 1,
-  },
-  accountName: {
+  confirmGoogleBtnText: {
     fontSize: 13,
     fontWeight: '700',
-    color: theme.colors.textPrimary,
-  },
-  accountEmail: {
-    fontSize: 11,
-    color: theme.colors.textSecondary,
-  },
-  accountMeta: {
-    fontSize: 10,
-    color: theme.colors.primary,
-    fontWeight: '600',
-    marginTop: 1,
+    color: '#FFFFFF',
   },
   realGoogleOAuthBtn: {
     flexDirection: 'row',
