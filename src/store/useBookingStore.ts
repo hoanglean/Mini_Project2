@@ -455,7 +455,27 @@ export const useBookingStore = create<BookingStoreState>()(
             return { success: false, error: error.message };
           }
 
+          if (authData.user?.identities && authData.user.identities.length === 0) {
+            return {
+              success: false,
+              error: 'Email này đã tồn tại trong hệ thống. Vui lòng chuyển sang tab "Đăng Nhập".',
+            };
+          }
+
           if (authData.user) {
+            // Ensure profile is saved to Supabase profiles table
+            try {
+              await supabase.from('profiles').upsert({
+                id: authData.user.id,
+                student_id: regData.studentId.trim().toUpperCase(),
+                name: regData.name.trim(),
+                email: regData.email.trim(),
+                faculty: regData.faculty.trim() || 'Khoa Công Nghệ Thông Tin',
+              });
+            } catch (profileErr) {
+              console.warn('Profile upsert warning:', profileErr);
+            }
+
             const newUser: UserSession = {
               studentId: regData.studentId.trim().toUpperCase(),
               name: regData.name.trim(),

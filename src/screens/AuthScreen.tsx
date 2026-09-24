@@ -1,74 +1,58 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  TextInput,
   TouchableOpacity,
   ScrollView,
   SafeAreaView,
   StatusBar,
   ActivityIndicator,
-  Modal,
   Alert,
   Platform,
-  Image,
-  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
+import Svg, { Path } from 'react-native-svg';
 import { useBookingStore } from '../store/useBookingStore';
 import { supabase } from '../lib/supabase';
 import { theme } from '../utils/theme';
 
 WebBrowser.maybeCompleteAuthSession();
 
-const POPULAR_FACULTIES = [
-  'Khoa Công Nghệ Thông Tin',
-  'Khoa Kỹ Thuật Phần Mềm & AI',
-  'Khoa Điện - Điện Tử',
-  'Khoa Khoa Học Máy Tính',
-  'Khoa Quản Trị Kinh Doanh',
-];
+// Official 4-color Google G Logo in SVG
+const GoogleLogo: React.FC<{ size?: number }> = ({ size = 22 }) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24">
+    <Path
+      fill="#4285F4"
+      d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.82-2.4 3.68v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.17z"
+    />
+    <Path
+      fill="#34A853"
+      d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.24v3.15C3.26 21.36 7.33 24 12 24z"
+    />
+    <Path
+      fill="#FBBC05"
+      d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.24C.45 8.15 0 9.99 0 12s.45 3.85 1.24 5.42l4.04-3.15z"
+    />
+    <Path
+      fill="#EA4335"
+      d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.24 6.58l4.04 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
+    />
+  </Svg>
+);
 
 export const AuthScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const route = useRoute<any>();
-
-  const loginWithEmail = useBookingStore((state) => state.loginWithEmail);
-  const registerWithEmail = useBookingStore((state) => state.registerWithEmail);
   const loginWithGoogle = useBookingStore((state) => state.loginWithGoogle);
   const continueAsGuest = useBookingStore((state) => state.continueAsGuest);
 
-  const initialMode = route.params?.mode === 'register' ? 'register' : 'login';
-  const [authMode, setAuthMode] = useState<'login' | 'register'>(initialMode);
-
-  // Form states - Login
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [showLoginPassword, setShowLoginPassword] = useState(false);
-  const [rememberMe, setRememberMe] = useState(true);
-
-  // Form states - Register
-  const [regName, setRegName] = useState('');
-  const [regStudentId, setRegStudentId] = useState('');
-  const [regEmail, setRegEmail] = useState('');
-  const [regFaculty, setRegFaculty] = useState(POPULAR_FACULTIES[0]);
-  const [regPassword, setRegPassword] = useState('');
-  const [regConfirmPassword, setRegConfirmPassword] = useState('');
-  const [showRegPassword, setShowRegPassword] = useState(false);
-  const [agreeTerms, setAgreeTerms] = useState(true);
-
-  // Status & Modals
   const [loading, setLoading] = useState(false);
-  const [forgotModalVisible, setForgotModalVisible] = useState(false);
-  const [forgotEmail, setForgotEmail] = useState('');
-  const [forgotSubmitted, setForgotSubmitted] = useState(false);
 
-  // Handle OAuth callback on Web if redirected
-  React.useEffect(() => {
+  // Auto-detect OAuth redirect callback on Web (hash or PKCE code)
+  useEffect(() => {
     if (Platform.OS === 'web' && typeof window !== 'undefined') {
       const hash = window.location.hash;
       const search = window.location.search;
@@ -115,13 +99,13 @@ export const AuthScreen: React.FC = () => {
         });
       }
     }
-  }, []);
+  }, [loginWithGoogle, navigation]);
 
   const handleGooglePress = async () => {
     try {
       setLoading(true);
 
-      // On Web: redirect directly in the same tab for smooth authentication
+      // On Web: redirect directly in current tab for the smoothest browser UX
       if (Platform.OS === 'web' && typeof window !== 'undefined') {
         const { error } = await supabase.auth.signInWithOAuth({
           provider: 'google',
@@ -154,7 +138,6 @@ export const AuthScreen: React.FC = () => {
       if (data?.url) {
         const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
         if (result.type === 'success' && result.url) {
-          // Extract tokens from the redirect URL
           const url = new URL(result.url);
           const params = new URLSearchParams(url.hash?.substring(1) || url.search?.substring(1));
           const accessToken = params.get('access_token');
@@ -191,64 +174,6 @@ export const AuthScreen: React.FC = () => {
     }
   };
 
-  const handleLoginSubmit = async () => {
-    if (!loginEmail.trim()) {
-      Alert.alert('Chưa nhập Email / MSSV', 'Vui lòng điền địa chỉ email hoặc mã số sinh viên.');
-      return;
-    }
-    if (!loginPassword.trim()) {
-      Alert.alert('Chưa nhập Mật khẩu', 'Vui lòng nhập mật khẩu tài khoản.');
-      return;
-    }
-
-    setLoading(true);
-    const result = await loginWithEmail(loginEmail, loginPassword);
-    setLoading(false);
-
-    if (result.success) {
-      navigation.replace('MainTabs');
-    } else {
-      Alert.alert('Đăng nhập thất bại', result.error || 'Vui lòng kiểm tra lại thông tin.');
-    }
-  };
-
-  const handleRegisterSubmit = async () => {
-    if (!regName.trim() || !regStudentId.trim() || !regEmail.trim()) {
-      Alert.alert('Thiếu thông tin', 'Vui lòng điền Họ tên, MSSV và Email.');
-      return;
-    }
-    if (!regPassword || regPassword.length < 6) {
-      Alert.alert('Mật khẩu yếu', 'Mật khẩu cần có độ dài từ 6 ký tự trở lên.');
-      return;
-    }
-    if (regPassword !== regConfirmPassword) {
-      Alert.alert('Mật khẩu không khớp', 'Mật khẩu xác nhận không trùng khớp với mật khẩu đã nhập.');
-      return;
-    }
-    if (!agreeTerms) {
-      Alert.alert('Điều khoản', 'Vui lòng đồng ý với Nội quy phòng học để tiếp tục.');
-      return;
-    }
-
-    setLoading(true);
-    const result = await registerWithEmail({
-      name: regName,
-      studentId: regStudentId,
-      email: regEmail,
-      faculty: regFaculty,
-      password: regPassword,
-    });
-    setLoading(false);
-
-    if (result.success) {
-      Alert.alert('Đăng ký thành công! 🎉', 'Chào mừng bạn đến với Campus Space!', [
-        { text: 'Bắt đầu', onPress: () => navigation.replace('MainTabs') },
-      ]);
-    } else {
-      Alert.alert('Lỗi đăng ký', result.error || 'Đã có lỗi xảy ra.');
-    }
-  };
-
   const handleGuestContinue = () => {
     continueAsGuest();
     navigation.replace('MainTabs');
@@ -256,442 +181,162 @@ export const AuthScreen: React.FC = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFFFF" />
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={{ flex: 1 }}
+      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
+
+      {/* Decorative Background Glows */}
+      <View style={styles.bgGlowTop} pointerEvents="none" />
+      <View style={styles.bgGlowBottom} pointerEvents="none" />
+
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
       >
-        <ScrollView
-          contentContainerStyle={styles.scrollContainer}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Top Bar: Brand & Skip Button */}
-          <View style={styles.topBar}>
-            <View style={styles.brandRow}>
-              <View style={styles.brandIconCircle}>
-                <Ionicons name="school" size={20} color="#FFFFFF" />
+        {/* Top Header Bar */}
+        <View style={styles.topBar}>
+          <View style={styles.brandRow}>
+            <View style={styles.logoBadge}>
+              <Ionicons name="school" size={20} color="#FFFFFF" />
+            </View>
+            <View>
+              <Text style={styles.logoText}>Campus Space</Text>
+              <Text style={styles.logoTagline}>VKU SMART BOOKING</Text>
+            </View>
+          </View>
+
+          <TouchableOpacity
+            style={styles.guestPill}
+            onPress={handleGuestContinue}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.guestPillText}>Khách</Text>
+            <Ionicons name="arrow-forward" size={13} color={theme.colors.primary} />
+          </TouchableOpacity>
+        </View>
+
+        {/* Hero Section */}
+        <View style={styles.heroSection}>
+          <View style={styles.verifiedTag}>
+            <View style={styles.verifiedDot} />
+            <Text style={styles.verifiedTagText}>HỆ THỐNG ĐẶT PHÒNG HỌC & LAB</Text>
+          </View>
+
+          <Text style={styles.heroTitle}>
+            Không gian học tập <Text style={styles.heroTitleHighlight}>thông minh</Text> cho sinh viên
+          </Text>
+
+          <Text style={styles.heroSubtitle}>
+            Tra cứu phòng trống thời gian thực tại các tòa nhà A, B, C, V. Đặt chỗ tức thì và nhận thông báo nhắc nhở tự động.
+          </Text>
+
+          {/* 3 Quick Value Props */}
+          <View style={styles.featureGrid}>
+            <View style={styles.featureCard}>
+              <View style={[styles.featureIconBox, { backgroundColor: '#EEF2FF' }]}>
+                <Ionicons name="business" size={18} color="#4F46E5" />
               </View>
-              <Text style={styles.brandTitle}>Campus Space</Text>
+              <Text style={styles.featureCardTitle}>4 Tòa Nhà</Text>
+              <Text style={styles.featureCardDesc}>Khu A, B, C & Lab V</Text>
             </View>
 
-            <TouchableOpacity
-              style={styles.skipBtn}
-              onPress={handleGuestContinue}
-              activeOpacity={0.7}
-            >
-              <Text style={styles.skipBtnText}>Khách</Text>
-              <Ionicons name="arrow-forward" size={14} color={theme.colors.textSecondary} />
-            </TouchableOpacity>
+            <View style={styles.featureCard}>
+              <View style={[styles.featureIconBox, { backgroundColor: '#ECFDF5' }]}>
+                <Ionicons name="flash" size={18} color="#10B981" />
+              </View>
+              <Text style={styles.featureCardTitle}>Đặt 30s</Text>
+              <Text style={styles.featureCardDesc}>Xác nhận tức thì</Text>
+            </View>
+
+            <View style={styles.featureCard}>
+              <View style={[styles.featureIconBox, { backgroundColor: '#FEF3C7' }]}>
+                <Ionicons name="qr-code" size={18} color="#D97706" />
+              </View>
+              <Text style={styles.featureCardTitle}>Vé QR Code</Text>
+              <Text style={styles.featureCardDesc}>Check-in tại phòng</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* Main Google Login Card */}
+        <View style={styles.authCard}>
+          <View style={styles.cardHeader}>
+            <View style={styles.cardIconRing}>
+              <Ionicons name="shield-checkmark" size={24} color={theme.colors.primary} />
+            </View>
+            <Text style={styles.cardTitle}>Đăng Nhập Hệ Thống</Text>
+            <Text style={styles.cardSubtitle}>
+              Xác thực an toàn bằng tài khoản Google trường (@vku.udn.vn) hoặc cá nhân để lưu dữ liệu đặt phòng lên đám mây.
+            </Text>
           </View>
 
-          {/* Hero Welcome Banner */}
-          <View style={styles.heroBox}>
-            <Text style={styles.heroSubtitle}>CỔNG ĐĂNG NHẬP SINH VIÊN</Text>
-            <Text style={styles.heroTitle}>
-              {authMode === 'login'
-                ? 'Chào mừng bạn trở lại! 👋'
-                : 'Tạo tài khoản sinh viên mới 🎓'}
-            </Text>
-            <Text style={styles.heroDesc}>
-              {authMode === 'login'
-                ? 'Đăng nhập để đặt phòng tự học, phòng lab và nhận thông báo nhắc giờ học tức thì.'
-                : 'Đăng ký nhanh bằng mã số sinh viên để đặt chỗ nghiên cứu và phòng máy tính.'}
-            </Text>
-          </View>
-
-          {/* Google Sign-In Button */}
+          {/* Google Sign-in Button */}
           <TouchableOpacity
-            style={styles.googleBtn}
+            style={[styles.googleButton, loading && styles.googleButtonDisabled]}
             onPress={handleGooglePress}
+            disabled={loading}
             activeOpacity={0.85}
           >
-            <View style={styles.googleLogoContainer}>
-              <Ionicons name="logo-google" size={18} color="#EA4335" />
-            </View>
-            <Text style={styles.googleBtnText}>Tiếp tục với Google</Text>
+            {loading ? (
+              <View style={styles.loadingRow}>
+                <ActivityIndicator size="small" color={theme.colors.primary} />
+                <Text style={styles.loadingText}>Đang kết nối Google...</Text>
+              </View>
+            ) : (
+              <>
+                <View style={styles.googleIconBox}>
+                  <GoogleLogo size={24} />
+                </View>
+                <Text style={styles.googleButtonText}>Tiếp tục với Google</Text>
+                <Ionicons name="arrow-forward" size={18} color="#64748B" />
+              </>
+            )}
           </TouchableOpacity>
 
           {/* Divider */}
           <View style={styles.dividerRow}>
             <View style={styles.dividerLine} />
-            <Text style={styles.dividerText}>hoặc tài khoản sinh viên</Text>
+            <Text style={styles.dividerText}>HOẶC TRẢI NGHIỆM TRƯỚC</Text>
             <View style={styles.dividerLine} />
           </View>
 
-          {/* Tab Selector: Đăng Nhập / Đăng Ký */}
-          <View style={styles.tabContainer}>
-            <TouchableOpacity
-              style={[styles.tabBtn, authMode === 'login' && styles.tabBtnActive]}
-              onPress={() => setAuthMode('login')}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name="log-in-outline"
-                size={16}
-                color={authMode === 'login' ? theme.colors.primary : theme.colors.textMuted}
-              />
-              <Text
-                style={[
-                  styles.tabBtnText,
-                  authMode === 'login' && styles.tabBtnTextActive,
-                ]}
-              >
-                Đăng Nhập
-              </Text>
-            </TouchableOpacity>
+          {/* Continue as Guest Button */}
+          <TouchableOpacity
+            style={styles.guestButton}
+            onPress={handleGuestContinue}
+            activeOpacity={0.8}
+          >
+            <Ionicons name="compass-outline" size={19} color={theme.colors.textSecondary} />
+            <Text style={styles.guestButtonText}>Khám phá với tư cách Khách tham quan</Text>
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              style={[styles.tabBtn, authMode === 'register' && styles.tabBtnActive]}
-              onPress={() => setAuthMode('register')}
-              activeOpacity={0.8}
-            >
-              <Ionicons
-                name="person-add-outline"
-                size={16}
-                color={authMode === 'register' ? theme.colors.primary : theme.colors.textMuted}
-              />
-              <Text
-                style={[
-                  styles.tabBtnText,
-                  authMode === 'register' && styles.tabBtnTextActive,
-                ]}
-              >
-                Đăng Ký
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          {/* Form Content: LOGIN */}
-          {authMode === 'login' && (
-            <View style={styles.formCard}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>EMAIL HOẶC MÃ SỐ SINH VIÊN (MSSV)</Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="mail-outline" size={18} color={theme.colors.textMuted} />
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="ví dụ: hoanglean61@gmail.com hoặc 22IT-108"
-                    placeholderTextColor={theme.colors.textMuted}
-                    value={loginEmail}
-                    onChangeText={setLoginEmail}
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    keyboardType="email-address"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <View style={styles.labelRow}>
-                  <Text style={styles.inputLabel}>MẬT KHẨU</Text>
-                  <TouchableOpacity
-                    onPress={() => setForgotModalVisible(true)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.forgotLink}>Quên mật khẩu?</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="lock-closed-outline" size={18} color={theme.colors.textMuted} />
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="Nhập mật khẩu (tối thiểu 6 ký tự)"
-                    placeholderTextColor={theme.colors.textMuted}
-                    value={loginPassword}
-                    onChangeText={setLoginPassword}
-                    secureTextEntry={!showLoginPassword}
-                    autoCapitalize="none"
-                  />
-                  <TouchableOpacity
-                    onPress={() => setShowLoginPassword(!showLoginPassword)}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    <Ionicons
-                      name={showLoginPassword ? 'eye-off-outline' : 'eye-outline'}
-                      size={18}
-                      color={theme.colors.textMuted}
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Remember Me Option */}
-              <TouchableOpacity
-                style={styles.checkboxRow}
-                onPress={() => setRememberMe(!rememberMe)}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.checkboxBox, rememberMe && styles.checkboxBoxActive]}>
-                  {rememberMe && <Ionicons name="checkmark" size={13} color="#FFFFFF" />}
-                </View>
-                <Text style={styles.checkboxLabel}>Ghi nhớ đăng nhập trên thiết bị này</Text>
-              </TouchableOpacity>
-
-              {/* Submit CTA Button */}
-              <TouchableOpacity
-                style={[styles.primarySubmitBtn, loading && { opacity: 0.7 }]}
-                onPress={handleLoginSubmit}
-                disabled={loading}
-                activeOpacity={0.85}
-              >
-                {loading ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Text style={styles.primarySubmitText}>Đăng Nhập Vào Hệ Thống</Text>
-                    <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
-                  </>
-                )}
-              </TouchableOpacity>
+          {/* Trust badges */}
+          <View style={styles.trustRow}>
+            <View style={styles.trustItem}>
+              <Ionicons name="lock-closed" size={12} color="#10B981" />
+              <Text style={styles.trustText}>OAuth 2.0</Text>
             </View>
-          )}
-
-          {/* Form Content: REGISTER */}
-          {authMode === 'register' && (
-            <View style={styles.formCard}>
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>HỌ VÀ TÊN SINH VIÊN *</Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="person-outline" size={18} color={theme.colors.textMuted} />
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="ví dụ: Lê An Hoàng"
-                    placeholderTextColor={theme.colors.textMuted}
-                    value={regName}
-                    onChangeText={setRegName}
-                    autoCapitalize="words"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>MÃ SỐ SINH VIÊN (MSSV) *</Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="card-outline" size={18} color={theme.colors.textMuted} />
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="ví dụ: 22IT-108 hoặc B22DCCN001"
-                    placeholderTextColor={theme.colors.textMuted}
-                    value={regStudentId}
-                    onChangeText={setRegStudentId}
-                    autoCapitalize="characters"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>KHOA / VIỆN ĐÀO TẠO</Text>
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  contentContainerStyle={styles.facultyChipsScroll}
-                >
-                  {POPULAR_FACULTIES.map((fac) => {
-                    const isSelected = regFaculty === fac;
-                    return (
-                      <TouchableOpacity
-                        key={fac}
-                        style={[
-                          styles.facultyChip,
-                          isSelected && styles.facultyChipSelected,
-                        ]}
-                        onPress={() => setRegFaculty(fac)}
-                        activeOpacity={0.75}
-                      >
-                        <Text
-                          style={[
-                            styles.facultyChipText,
-                            isSelected && styles.facultyChipTextSelected,
-                          ]}
-                        >
-                          {fac}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>ĐỊA CHỈ EMAIL *</Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="mail-outline" size={18} color={theme.colors.textMuted} />
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="email trường hoặc email cá nhân"
-                    placeholderTextColor={theme.colors.textMuted}
-                    value={regEmail}
-                    onChangeText={setRegEmail}
-                    autoCapitalize="none"
-                    keyboardType="email-address"
-                  />
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>MẬT KHẨU *</Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="lock-closed-outline" size={18} color={theme.colors.textMuted} />
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="Tối thiểu 6 ký tự"
-                    placeholderTextColor={theme.colors.textMuted}
-                    value={regPassword}
-                    onChangeText={setRegPassword}
-                    secureTextEntry={!showRegPassword}
-                    autoCapitalize="none"
-                  />
-                  <TouchableOpacity
-                    onPress={() => setShowRegPassword(!showRegPassword)}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    <Ionicons
-                      name={showRegPassword ? 'eye-off-outline' : 'eye-outline'}
-                      size={18}
-                      color={theme.colors.textMuted}
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              <View style={styles.inputGroup}>
-                <Text style={styles.inputLabel}>XÁC NHẬN MẬT KHẨU *</Text>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="shield-checkmark-outline" size={18} color={theme.colors.textMuted} />
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="Nhập lại mật khẩu"
-                    placeholderTextColor={theme.colors.textMuted}
-                    value={regConfirmPassword}
-                    onChangeText={setRegConfirmPassword}
-                    secureTextEntry={!showRegPassword}
-                    autoCapitalize="none"
-                  />
-                </View>
-              </View>
-
-              {/* Terms Checkbox */}
-              <TouchableOpacity
-                style={styles.checkboxRow}
-                onPress={() => setAgreeTerms(!agreeTerms)}
-                activeOpacity={0.8}
-              >
-                <View style={[styles.checkboxBox, agreeTerms && styles.checkboxBoxActive]}>
-                  {agreeTerms && <Ionicons name="checkmark" size={13} color="#FFFFFF" />}
-                </View>
-                <Text style={styles.checkboxLabel}>
-                  Tôi đồng ý với <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Nội quy phòng học</Text> và Điều khoản campus
-                </Text>
-              </TouchableOpacity>
-
-              {/* Register Submit Button */}
-              <TouchableOpacity
-                style={[styles.primarySubmitBtn, loading && { opacity: 0.7 }]}
-                onPress={handleRegisterSubmit}
-                disabled={loading}
-                activeOpacity={0.85}
-              >
-                {loading ? (
-                  <ActivityIndicator size="small" color="#FFFFFF" />
-                ) : (
-                  <>
-                    <Text style={styles.primarySubmitText}>Đăng Ký Tài Khoản</Text>
-                    <Ionicons name="checkmark-circle" size={16} color="#FFFFFF" />
-                  </>
-                )}
-              </TouchableOpacity>
+            <Text style={styles.trustDot}>•</Text>
+            <View style={styles.trustItem}>
+              <Ionicons name="cloud-done" size={12} color="#10B981" />
+              <Text style={styles.trustText}>Supabase Cloud</Text>
             </View>
-          )}
-
-          {/* Footer Note */}
-          <View style={styles.footerNoteBox}>
-            <Ionicons name="shield-checkmark" size={14} color={theme.colors.accentDark} />
-            <Text style={styles.footerNoteText}>
-              Bảo mật danh tính sinh viên & kết nối trực tiếp cổng dữ liệu phòng học
-            </Text>
-          </View>
-        </ScrollView>
-      </KeyboardAvoidingView>
-
-      {/* Forgot Password Modal */}
-      <Modal
-        visible={forgotModalVisible}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setForgotModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.forgotCard}>
-            <View style={styles.forgotIconBox}>
-              <Ionicons name="key-outline" size={26} color={theme.colors.primary} />
+            <Text style={styles.trustDot}>•</Text>
+            <View style={styles.trustItem}>
+              <Ionicons name="notifications" size={12} color="#10B981" />
+              <Text style={styles.trustText}>Nhắc giờ học</Text>
             </View>
-            <Text style={styles.forgotTitle}>Khôi Phục Mật Khẩu</Text>
-            <Text style={styles.forgotSubtitle}>
-              Nhập email tài khoản sinh viên của bạn để nhận mã khôi phục đặt lại mật khẩu.
-            </Text>
-
-            {forgotSubmitted ? (
-              <View style={styles.forgotSuccessBox}>
-                <Ionicons name="checkmark-circle" size={32} color={theme.colors.accentDark} />
-                <Text style={styles.forgotSuccessText}>
-                  Đã gửi đường dẫn khôi phục tới:
-                </Text>
-                <Text style={styles.forgotSuccessEmail}>{forgotEmail}</Text>
-                <TouchableOpacity
-                  style={styles.forgotDoneBtn}
-                  onPress={() => {
-                    setForgotSubmitted(false);
-                    setForgotModalVisible(false);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={styles.forgotDoneBtnText}>Đã hiểu</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <>
-                <View style={styles.inputWrapper}>
-                  <Ionicons name="mail-outline" size={18} color={theme.colors.textMuted} />
-                  <TextInput
-                    style={styles.textInput}
-                    placeholder="Nhập email sinh viên..."
-                    placeholderTextColor={theme.colors.textMuted}
-                    value={forgotEmail}
-                    onChangeText={setForgotEmail}
-                    autoCapitalize="none"
-                    keyboardType="email-address"
-                  />
-                </View>
-
-                <View style={styles.forgotActions}>
-                  <TouchableOpacity
-                    style={styles.forgotCancelBtn}
-                    onPress={() => setForgotModalVisible(false)}
-                    activeOpacity={0.7}
-                  >
-                    <Text style={styles.forgotCancelText}>Hủy</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    style={styles.forgotSubmitBtn}
-                    onPress={() => {
-                      if (!forgotEmail.trim()) {
-                        Alert.alert('Chưa nhập email', 'Vui lòng nhập email tài khoản của bạn.');
-                        return;
-                      }
-                      setForgotSubmitted(true);
-                    }}
-                    activeOpacity={0.85}
-                  >
-                    <Text style={styles.forgotSubmitText}>Gửi Yêu Cầu</Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
           </View>
         </View>
-      </Modal>
+
+        {/* Footer info */}
+        <View style={styles.footerBox}>
+          <Text style={styles.footerText}>
+            Hệ thống Quản lý & Đặt phòng Học tập - Phòng Thực hành
+          </Text>
+          <Text style={styles.footerSub}>
+            Trường Đại học Công nghệ Thông tin & Truyền thông Việt - Hàn (VKU)
+          </Text>
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -701,99 +346,269 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  scrollContainer: {
+  scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 20,
-    paddingTop: 12,
-    paddingBottom: 36,
+    paddingTop: Platform.OS === 'android' ? 24 : 12,
+    paddingBottom: 32,
+    maxWidth: 520,
+    width: '100%',
+    alignSelf: 'center',
   },
+
+  // Glow elements
+  bgGlowTop: {
+    position: 'absolute',
+    top: -80,
+    right: -40,
+    width: 240,
+    height: 240,
+    borderRadius: 120,
+    backgroundColor: 'rgba(79, 70, 229, 0.08)',
+  },
+  bgGlowBottom: {
+    position: 'absolute',
+    bottom: -60,
+    left: -40,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    backgroundColor: 'rgba(16, 185, 129, 0.07)',
+  },
+
+  // Top Bar
   topBar: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 20,
+    justifyContent: 'space-between',
+    marginBottom: 24,
+    paddingTop: 6,
   },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 12,
   },
-  brandIconCircle: {
-    width: 32,
-    height: 32,
-    borderRadius: 10,
+  logoBadge: {
+    width: 42,
+    height: 42,
+    borderRadius: 12,
     backgroundColor: theme.colors.primary,
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: theme.colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  brandTitle: {
-    fontSize: 16,
+  logoText: {
+    fontSize: 18,
     fontWeight: '800',
-    color: theme.colors.textPrimary,
+    color: '#0F172A',
     letterSpacing: -0.3,
   },
-  skipBtn: {
+  logoTagline: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: theme.colors.primary,
+    letterSpacing: 0.8,
+  },
+  guestPill: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    backgroundColor: '#EEF2FF',
     paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: theme.borderRadius.full,
-    backgroundColor: '#EDF2F7',
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#E0E7FF',
   },
-  skipBtnText: {
+  guestPillText: {
     fontSize: 12,
     fontWeight: '700',
-    color: theme.colors.textSecondary,
-  },
-  heroBox: {
-    marginBottom: 20,
-  },
-  heroSubtitle: {
-    fontSize: 11,
-    fontWeight: '800',
     color: theme.colors.primary,
-    letterSpacing: 0.8,
-    marginBottom: 4,
   },
-  heroTitle: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: theme.colors.textPrimary,
-    letterSpacing: -0.5,
-    marginBottom: 6,
+
+  // Hero Section
+  heroSection: {
+    marginBottom: 24,
   },
-  heroDesc: {
-    fontSize: 13,
-    color: theme.colors.textSecondary,
-    lineHeight: 18,
-  },
-  googleBtn: {
+  verifiedTag: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
+    backgroundColor: '#EEF2FF',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    marginBottom: 12,
+  },
+  verifiedDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: theme.colors.primary,
+    marginRight: 6,
+  },
+  verifiedTagText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: theme.colors.primary,
+    letterSpacing: 0.5,
+  },
+  heroTitle: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#0F172A',
+    lineHeight: 34,
+    marginBottom: 10,
+    letterSpacing: -0.5,
+  },
+  heroTitleHighlight: {
+    color: theme.colors.primary,
+  },
+  heroSubtitle: {
+    fontSize: 14,
+    color: '#64748B',
+    lineHeight: 22,
+    marginBottom: 18,
+  },
+
+  // Feature Grid
+  featureGrid: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  featureCard: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    padding: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#F1F5F9',
+    alignItems: 'center',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+  },
+  featureIconBox: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 6,
+  },
+  featureCardTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#0F172A',
+    marginBottom: 2,
+  },
+  featureCardDesc: {
+    fontSize: 10,
+    color: '#94A3B8',
+    textAlign: 'center',
+  },
+
+  // Auth Card
+  authCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: 22,
+    padding: 22,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.08,
+    shadowRadius: 20,
+    elevation: 4,
+    marginBottom: 20,
+  },
+  cardHeader: {
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  cardIconRing: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: '#EEF2FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  cardTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: '#0F172A',
+    marginBottom: 6,
+  },
+  cardSubtitle: {
+    fontSize: 13,
+    color: '#64748B',
+    textAlign: 'center',
+    lineHeight: 19,
+    paddingHorizontal: 8,
+  },
+
+  // Google Button
+  googleButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     backgroundColor: '#FFFFFF',
     borderWidth: 1.5,
     borderColor: '#E2E8F0',
-    borderRadius: theme.borderRadius.md,
-    paddingVertical: 13,
+    borderRadius: 16,
+    paddingVertical: 14,
     paddingHorizontal: 16,
-    marginBottom: 16,
-    ...theme.shadows.soft,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+    marginBottom: 18,
   },
-  googleLogoContainer: {
-    marginRight: 10,
+  googleButtonDisabled: {
+    opacity: 0.7,
   },
-  googleBtnText: {
-    fontSize: 14,
+  googleIconBox: {
+    width: 28,
+    height: 28,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  googleButtonText: {
+    flex: 1,
+    fontSize: 15,
     fontWeight: '700',
-    color: '#1F2937',
+    color: '#1E293B',
+    marginLeft: 12,
+  },
+  loadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    gap: 10,
+    paddingVertical: 3,
+  },
+  loadingText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: theme.colors.primary,
   },
 
+  // Divider
   dividerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginVertical: 10,
-    gap: 12,
+    marginBottom: 16,
   },
   dividerLine: {
     flex: 1,
@@ -802,268 +617,71 @@ const styles = StyleSheet.create({
   },
   dividerText: {
     fontSize: 11,
-    fontWeight: '600',
-    color: theme.colors.textMuted,
-  },
-  tabContainer: {
-    flexDirection: 'row',
-    backgroundColor: '#EDF2F7',
-    borderRadius: theme.borderRadius.md,
-    padding: 4,
-    marginBottom: 16,
-  },
-  tabBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 9,
-    borderRadius: theme.borderRadius.sm,
-    gap: 6,
-  },
-  tabBtnActive: {
-    backgroundColor: '#FFFFFF',
-    ...theme.shadows.soft,
-  },
-  tabBtnText: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: theme.colors.textMuted,
-  },
-  tabBtnTextActive: {
-    color: theme.colors.primary,
     fontWeight: '700',
-  },
-  formCard: {
-    backgroundColor: '#FFFFFF',
-    borderRadius: theme.borderRadius.lg,
-    padding: 18,
-    borderWidth: 1,
-    borderColor: '#E2E8F0',
-    ...theme.shadows.medium,
-  },
-  inputGroup: {
-    marginBottom: 14,
-  },
-  labelRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 5,
-  },
-  inputLabel: {
-    fontSize: 10,
-    fontWeight: '800',
-    color: theme.colors.textSecondary,
+    color: '#94A3B8',
+    paddingHorizontal: 12,
     letterSpacing: 0.6,
-    marginBottom: 5,
   },
-  forgotLink: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: theme.colors.primary,
-  },
-  inputWrapper: {
+
+  // Guest Button
+  guestButton: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
     backgroundColor: '#F8FAFC',
-    borderWidth: 1,
-    borderColor: '#CBD5E1',
-    borderRadius: theme.borderRadius.md,
-    paddingHorizontal: 12,
-    height: 46,
-    gap: 8,
-  },
-  textInput: {
-    flex: 1,
-    fontSize: 13,
-    color: theme.colors.textPrimary,
-    height: '100%',
-  },
-  checkboxRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-    marginBottom: 16,
-    marginTop: 2,
-  },
-  checkboxBox: {
-    width: 18,
-    height: 18,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: '#CBD5E1',
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-  },
-  checkboxBoxActive: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
-  },
-  checkboxLabel: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-    flex: 1,
-  },
-  primarySubmitBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: theme.colors.primary,
-    borderRadius: theme.borderRadius.md,
-    paddingVertical: 14,
-    gap: 8,
-    ...theme.shadows.soft,
-  },
-  primarySubmitText: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  quickFillBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 12,
-    paddingVertical: 6,
-    gap: 6,
-  },
-  quickFillText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: theme.colors.primary,
-  },
-  facultyChipsScroll: {
-    gap: 6,
-    paddingVertical: 2,
-  },
-  facultyChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 7,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: 14,
+    paddingVertical: 13,
     borderWidth: 1,
     borderColor: '#E2E8F0',
-    backgroundColor: '#F8FAFC',
-  },
-  facultyChipSelected: {
-    backgroundColor: theme.colors.primary,
-    borderColor: theme.colors.primary,
-  },
-  facultyChipText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: theme.colors.textSecondary,
-  },
-  facultyChipTextSelected: {
-    color: '#FFFFFF',
-    fontWeight: '700',
-  },
-  footerNoteBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    marginTop: 18,
-  },
-  footerNoteText: {
-    fontSize: 11,
-    color: theme.colors.textMuted,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.65)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  forgotCard: {
-    width: '100%',
-    maxWidth: 360,
-    backgroundColor: '#FFFFFF',
-    borderRadius: 18,
-    padding: 20,
-    alignItems: 'center',
-    ...theme.shadows.medium,
-  },
-  forgotIconBox: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: '#EEF2FF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  forgotTitle: {
-    fontSize: 17,
-    fontWeight: '800',
-    color: theme.colors.textPrimary,
-    marginBottom: 6,
-  },
-  forgotSubtitle: {
-    fontSize: 12,
-    color: theme.colors.textSecondary,
-    textAlign: 'center',
-    lineHeight: 17,
     marginBottom: 16,
   },
-  forgotActions: {
+  guestButtonText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#475569',
+  },
+
+  // Trust Badges
+  trustRow: {
     flexDirection: 'row',
-    gap: 10,
-    marginTop: 14,
-    width: '100%',
-  },
-  forgotCancelBtn: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 11,
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: '#EDF2F7',
-  },
-  forgotCancelText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: theme.colors.textSecondary,
-  },
-  forgotSubmitBtn: {
-    flex: 1.4,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 11,
-    borderRadius: theme.borderRadius.md,
-    backgroundColor: theme.colors.primary,
-  },
-  forgotSubmitText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
-  },
-  forgotSuccessBox: {
-    alignItems: 'center',
-    paddingVertical: 10,
     gap: 8,
+    paddingTop: 8,
+    borderTopWidth: 1,
+    borderTopColor: '#F1F5F9',
   },
-  forgotSuccessText: {
+  trustItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  trustText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+  },
+  trustDot: {
+    fontSize: 10,
+    color: '#CBD5E1',
+  },
+
+  // Footer
+  footerBox: {
+    alignItems: 'center',
+    paddingVertical: 8,
+  },
+  footerText: {
     fontSize: 12,
-    color: theme.colors.textSecondary,
+    color: '#94A3B8',
+    textAlign: 'center',
+    marginBottom: 2,
   },
-  forgotSuccessEmail: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: theme.colors.primary,
-    marginBottom: 10,
-  },
-  forgotDoneBtn: {
-    backgroundColor: theme.colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 10,
-    borderRadius: theme.borderRadius.md,
-  },
-  forgotDoneBtnText: {
-    fontSize: 13,
-    fontWeight: '700',
-    color: '#FFFFFF',
+  footerSub: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#64748B',
+    textAlign: 'center',
   },
 });
