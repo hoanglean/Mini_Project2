@@ -203,98 +203,10 @@ export const MOCK_ROOMS: Room[] = [
 ];
 
 /**
- * Pre-seeded reservations to demonstrate visual conflict prevention
- * right out of the box for today and tomorrow.
+ * Initial reservations: Empty array so no rooms are pre-booked.
+ * Only rooms booked by the user or fetched from Supabase will appear.
  */
 export const getInitialReservations = (): Reservation[] => {
-  const days = getUpcomingDays(3);
-  const today = days[0].dateString;
-  const tomorrow = days[1].dateString;
-
-  return [
-    {
-      id: 'RES-SEED-101',
-      roomId: 'room-a-101',
-      roomName: 'Turing AI & Deep Learning Lab',
-      roomCode: 'A-101',
-      building: 'Building A',
-      floor: 1,
-      date: today,
-      timeSlot: '09:30 - 11:30',
-      studentId: 'STU-99412',
-      studentName: 'Jordan Vance',
-      status: 'confirmed',
-      createdAt: new Date(Date.now() - 3600000).toISOString(),
-      qrPayload: JSON.stringify({
-        resId: 'RES-SEED-101',
-        roomId: 'room-a-101',
-        date: today,
-        slot: '09:30 - 11:30',
-        studentId: 'STU-99412',
-      }),
-    },
-    {
-      id: 'RES-SEED-102',
-      roomId: 'room-a-101',
-      roomName: 'Turing AI & Deep Learning Lab',
-      roomCode: 'A-101',
-      building: 'Building A',
-      floor: 1,
-      date: today,
-      timeSlot: '15:00 - 17:00',
-      studentId: 'STU-77210',
-      studentName: 'Samantha Chen',
-      status: 'confirmed',
-      createdAt: new Date(Date.now() - 7200000).toISOString(),
-      qrPayload: JSON.stringify({
-        resId: 'RES-SEED-102',
-        roomId: 'room-a-101',
-        date: today,
-        slot: '15:00 - 17:00',
-        studentId: 'STU-77210',
-      }),
-    },
-    {
-      id: 'RES-SEED-304',
-      roomId: 'room-a-304',
-      roomName: 'Quantum Collaboration Suite',
-      roomCode: 'A-304',
-      building: 'Building A',
-      floor: 3,
-      date: today,
-      timeSlot: '13:00 - 15:00',
-      studentId: 'STU-88291', // Current user's booking!
-      studentName: 'Alex Rivera',
-      status: 'confirmed',
-      createdAt: new Date(Date.now() - 10000000).toISOString(),
-      qrPayload: JSON.stringify({
-        resId: 'RES-SEED-304',
-        roomId: 'room-a-304',
-        date: today,
-        slot: '13:00 - 15:00',
-        studentId: 'STU-88291',
-      }),
-    },
-    {
-      id: 'RES-SEED-205',
-      roomId: 'room-b-205',
-      roomName: 'Silent Focus Study Pod',
-      roomCode: 'B-205',
-      building: 'Building B',
-      floor: 2,
-      date: tomorrow,
-      timeSlot: '07:30 - 09:30',
-      studentId: 'STU-44123',
-      studentName: 'Liam Zhao',
-      status: 'confirmed',
-      createdAt: new Date(Date.now() - 15000000).toISOString(),
-      qrPayload: JSON.stringify({
-        resId: 'RES-SEED-205',
-        roomId: 'room-b-205',
-        date: tomorrow,
-        slot: '07:30 - 09:30',
-        studentId: 'STU-44123',
-      }),
-    },
-  ];
+  return [];
 };
+

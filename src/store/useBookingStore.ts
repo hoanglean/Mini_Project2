@@ -86,7 +86,7 @@ export const useBookingStore = create<BookingStoreState>()(
   persist(
     (set, get) => ({
       rooms: MOCK_ROOMS,
-      activeReservations: getInitialReservations(),
+      activeReservations: [],
       selectedDate: getUpcomingDays(1)[0].dateString,
       filters: initialFilters,
       userSession: MOCK_USER,
@@ -637,10 +637,16 @@ export const useBookingStore = create<BookingStoreState>()(
         isAuthenticated: state.isAuthenticated,
       }),
       onRehydrateStorage: () => (state) => {
-        if (state?.userSession?.isLoggedIn) {
-          state.isAuthenticated = true;
+        if (state) {
+          // Clear any old mock seed reservations from local cache
+          state.activeReservations = (state.activeReservations || []).filter(
+            (r) => !r.id.startsWith('RES-SEED-')
+          );
+          if (state.userSession?.isLoggedIn) {
+            state.isAuthenticated = true;
+          }
+          state.setHydrated(true);
         }
-        state?.setHydrated(true);
       },
     }
   )
